@@ -28,8 +28,6 @@ CTrade trade;
 datetime openTimeBuy = 0;
 datetime openTimeSell = 0;
 
-
-
 int OnInit() {
   if (inpMagincNumber <= 0) {
     Alert("Magicnumber <= 0");
