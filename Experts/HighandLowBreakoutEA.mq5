@@ -4,8 +4,10 @@ static input long inpMagicNumber = 58473; //magicnumber
 static input double inpLots = 1; //lot size
 input int inpBars = 20; //bars fir high/low
 input int inpIndexFilter = 0; //index filter in % (0 = off)
-input int inpSt = 200; //stop loss in points (0 = off)
+input int inpSizeFilter = 0; //channel size filter in points (0 = off)
+input int inpSl = 200; //stop loss in points (0 = off)
 input int inpTp = 0; //take profit in points (0 = off)
+input bool inpTrailingSl = true; //trailing stop loss?
 
 double high = 0;
 double low = 0;
@@ -50,9 +52,9 @@ void OnTick() {
   if (
     cntBuy == 0 && high != 0 && 
     previousTick.ask < high && currentTick.ask >= high &&
-    CheckIndexFilter(highIdx)
+    CheckIndexFilter(highIdx) && CheckSizeFilter()
   ) {
-    double sl = inpSt == 0 ? 0 : currentTick.bid - inpSt * _Point;
+    double sl = inpSl == 0 ? 0 : currentTick.bid - inpSl * _Point;
     double tp = inpTp == 0 ? 0 : currentTick.bid + inpTp * _Point;
     if (!NormalizePrice(sl)) { 
       return;
@@ -68,9 +70,9 @@ void OnTick() {
   if (
     cntSell == 0 && low != 0 && 
     previousTick.bid > low && currentTick.bid <= low &&
-    CheckIndexFilter(lowIdx)
+    CheckIndexFilter(lowIdx) && CheckSizeFilter()
   ) {
-    double sl = inpSt == 0 ? 0 : currentTick.ask + inpSt * _Point;
+    double sl = inpSl == 0 ? 0 : currentTick.ask + inpSl * _Point;
     double tp = inpTp == 0 ? 0 : currentTick.ask - inpTp * _Point;
     if (!NormalizePrice(sl)) { 
       return;
@@ -82,6 +84,10 @@ void OnTick() {
       _Symbol, ORDER_TYPE_SELL, inpLots, currentTick.bid,
       sl, tp, "HighLowBreakout EA"
     );
+  }
+  
+  if (inpSl > 0 &&inpTrailingSl) {
+    UpdateStopLoss(inpSl * _Point);
   }
   
   highIdx = iHighest(_Symbol, PERIOD_CURRENT, MODE_HIGH, inpBars, 1);
@@ -109,8 +115,12 @@ bool CheckInputs() {
     Alert("Wrong input: index filter < 0 or >= 50");
     return false;
   }
-  if (inpSt < 0) {
-    Alert("Wrong input: Stop loss < 0");
+  if (inpSizeFilter < 0) {
+    Alert("Wrong input: Size filter < 0");
+    return false;
+  }
+  if (inpSl <= 0) {
+    Alert("Wrong input: Stop loss <= 0");
     return false;
   }
   if (inpTp < 0) {
@@ -131,6 +141,16 @@ bool CheckIndexFilter(int index) {
   return true;
 }
 
+bool CheckSizeFilter() {
+  if (
+    inpSizeFilter > 0 && 
+    high - low > inpSizeFilter * _Point
+  ) {
+    return false;
+  }
+  return true;
+}
+
 void DrawObjects() {
   datetime time = iTime(_Symbol, PERIOD_CURRENT, inpBars);
   datetime secoundTime = iTime(_Symbol, PERIOD_CURRENT, 1);
@@ -141,7 +161,7 @@ void DrawObjects() {
   ObjectSetInteger(NULL, highName, OBJPROP_WIDTH, 3);
   ObjectSetInteger(
     NULL, highName, OBJPROP_COLOR,
-    CheckIndexFilter(highIdx) ? clrLime : clrGray
+    CheckIndexFilter(highIdx) && CheckSizeFilter() ? clrLime : clrGray
   );
   
   string lowName = "low";
@@ -150,7 +170,7 @@ void DrawObjects() {
   ObjectSetInteger(NULL, lowName, OBJPROP_WIDTH, 3);
   ObjectSetInteger(
     NULL, lowName, OBJPROP_COLOR, 
-    CheckIndexFilter(lowIdx) ? clrLime : clrGray
+    CheckIndexFilter(lowIdx) && CheckSizeFilter() ? clrLime : clrGray
   );
   
   if (inpIndexFilter > 0) {
@@ -163,7 +183,6 @@ void DrawObjects() {
       (int) round(inpBars * inpIndexFilter * 0.01)
     );
     string idxName = "indexFilter";
-    ObjectDelete(NULL, idxName);
     ObjectCreate(NULL, idxName, OBJ_TREND, 0, timeFilter, low, secoundTimeFilter, low);
     ObjectSetInteger(NULL, idxName, OBJPROP_BACK, true);
     ObjectSetInteger(NULL, idxName, OBJPROP_FILL, true);
@@ -175,7 +194,8 @@ void DrawObjects() {
     "Bars: " + (string) inpBars + 
     " index filter: " + DoubleToString(round(inpBars * inpIndexFilter * 0.01), 0) + 
     " high index: " + (string) highIdx + 
-    " low index: " + (string) lowIdx
+    " low index: " + (string) lowIdx +
+    " size: " + DoubleToString((high - low) / _Point, 0)
   );
   ObjectDelete(NULL, textName);
   ObjectCreate(NULL, textName, OBJ_TEXT, 0, secoundTime, low);
@@ -240,46 +260,71 @@ bool NormalizePrice(double &price) {
   return true;
 }
 
-bool ClosePositions(int all_buy_sell) {
-  int total = PositionsTotal();
-  for (int i = total - 1; i >= 0; i--) {
+void UpdateStopLoss(double slDistance) {
+  if (inpSl == 0 || !inpTrailingSl) {
+    return;
+  }
+  
+  int posTotal = PositionsTotal();
+  for (int i = posTotal - 1; i >= 0; i--) {
     ulong posTicket = PositionGetTicket(i);
-    if (posTicket <= 0) {
-      Print("Failed to get position ticket");
-      return false;
+    if (posTotal <= 0) {
+      Print("Failde to get position ticket");
+      return;
     }
     if (!PositionSelectByTicket(posTicket)) {
-      Print("Failed to select position");
-      return false;
+      Print("Failed to select position by ticket");
+      return;
     }
-    long magic;
-    if (!PositionGetInteger(POSITION_MAGIC, magic)) {
-      Print("Failed to get position magic number");
-      return false;
+    ulong magicNumber;
+    if (!PositionGetInteger(POSITION_MAGIC, magicNumber)) {
+      Print("Failed to get position magicnumber");
+      return;
     }
-    if (magic == inpMagicNumber) {
-      long type;
-      if (!PositionGetInteger(POSITION_TYPE, type)) {
+    if (inpMagicNumber == magicNumber) {
+      long posType = -1;
+      if (!PositionGetInteger(POSITION_MAGIC, magicNumber)) {
         Print("Failed to get position type");
-        return false;
+        return;
       }
-      if (all_buy_sell == 1 && type == POSITION_TYPE_SELL) {
-        Print("continue all_buy_sell == 1");
+      double currSl, currTp;
+      if (!PositionGetDouble(POSITION_SL, currSl)) {
+        Print("Failed to get position stop loss");
+        return;
+      }
+      if (!PositionGetDouble(POSITION_TP, currTp)) {
+        Print("Failed to get position take profit");
+        return;
+      }
+      
+      double currPrice = posType == POSITION_TYPE_BUY ? currentTick.bid : currentTick.ask;
+      int n = posType == POSITION_TYPE_BUY ? 1 : -1;
+      double newSl = currPrice - slDistance * n;
+      if (!NormalizePrice(newSl)) {
+        return;
+      }
+      
+      if (
+        (newSl * n < currSl * n) || 
+        NormalizeDouble(MathAbs(newSl - currSl), _Digits) < _Point
+      ) {
         continue;
       }
-      if (all_buy_sell == 2 && type == POSITION_TYPE_BUY) {
-        Print("continue all_buy_sell == 2");
+      
+      long level = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
+      if (level != 0 && MathAbs(currPrice - newSl) <= level * _Point) {
+        Print("New stop loss inside stop level");
         continue;
-      }
-      trade.PositionClose(posTicket);
-      if (trade.ResultRetcode() != TRADE_RETCODE_DONE) {
+      } 
+      
+      if (!trade.PositionModify(posTicket, newSl, currTp)) {
         Print(
-          "Failed to close position. ticket: ", (string)posTicket,
-          " result: ", (string)trade.ResultRetcode(), 
-          " : ", trade.CheckResultRetcodeDescription()
+          "Failed to modigy position, ticket: ", (string) posTicket,
+          " currSl: ", (string) currSl,
+          " newSl: ", (string) currTp
         );
+        return;
       }
     }
   }
-  return true;
 }
