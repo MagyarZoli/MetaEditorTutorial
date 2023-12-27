@@ -4,8 +4,6 @@ static input long inpMagincNumber = 54321; // magic number
 static input double inpLotSize = 1; // lot size
 input int inpRSIPeriod = 14; // rsi period
 input int inpRSILevel = 70; // rsi level (upper)
-input int inpMAPeriod = 14; // ma period
-input ENUM_TIMEFRAMES inpMATimeframe = PERIOD_H1; // ma timeframe
 input int inpSl = 0; // stop loss in points (0 = off)
 input int inpTp = 0; // take profit in points (0 = off)
 input bool inpCloseSignal = true; // close trades by opposite signal
@@ -18,42 +16,17 @@ datetime openTimeBuy = 0;
 datetime openTimeSell = 0;
 
 int OnInit() {
-  if (inpMagincNumber <= 0) {
-    Alert("Magicnumber <= 0");
+  if (!CheckInputs()) {
     return INIT_PARAMETERS_INCORRECT;
   }
-  if (inpLotSize <= 0 || inpLotSize > 10) {
-    Alert("Lot size <= 0 or > 10");
-    return INIT_PARAMETERS_INCORRECT;
-  }
-  if (inpRSIPeriod <= 1) {
-    Alert("RSI period <= 1");
-    return INIT_PARAMETERS_INCORRECT;
-  }
-  if (inpRSILevel >= 100 || inpRSILevel <= 50) {
-    Alert("RSI level >= 100 or <= 50");
-    return INIT_PARAMETERS_INCORRECT;
-  }
-  if (inpSl < 0) {
-    Alert("Stop loss < 0");
-    return INIT_PARAMETERS_INCORRECT;
-  }
-  if (inpTp < 0) {
-    Alert("Take profit < 0");
-    return INIT_PARAMETERS_INCORRECT;
-  }
-  
   trade.SetExpertMagicNumber(inpMagincNumber);
-  
   handle = iRSI(_Symbol, PERIOD_CURRENT, inpRSIPeriod, PRICE_CLOSE);
   if (handle == INVALID_HANDLE) {
     Alert("Failed to create indicator handle");
     return INIT_FAILED;
   }
-  
   ArraySetAsSeries(buffer, true);
-  
-  return(INIT_SUCCEEDED);
+  return INIT_SUCCEEDED;
 }
 
 void OnDeinit(const int reason) {
@@ -72,11 +45,6 @@ void OnTick() {
     Print("Faild to get indicator values");
     return;
   }
-  
-  Comment(
-    "buffer[0]: ", buffer[0],
-    "\nbuffer[1] ", buffer[1]
-  );
   
   int cntBuy, cntSell;
   if (!CountOpenPositions(cntBuy, cntSell)) {
@@ -139,6 +107,35 @@ void OnTick() {
       currentTick.bid, sl, tp, "RSI EA"
     );
   }
+}
+
+bool CheckInputs() {
+  bool correct = true;
+  if (inpMagincNumber <= 0) {
+    Alert("Magicnumber <= 0");
+    correct = false;
+  }
+  if (inpLotSize <= 0 || inpLotSize > 10) {
+    Alert("Lot size <= 0 or > 10");
+    correct = false;
+  }
+  if (inpRSIPeriod <= 1) {
+    Alert("RSI period <= 1");
+    correct = false;
+  }
+  if (inpRSILevel >= 100 || inpRSILevel <= 50) {
+    Alert("RSI level >= 100 or <= 50");
+    correct = false;
+  }
+  if (inpSl < 0) {
+    Alert("Stop loss < 0");
+    correct = false;
+  }
+  if (inpTp < 0) {
+    Alert("Take profit < 0");
+    correct = false;
+  }
+  return correct;
 }
 
 bool CountOpenPositions(int &cntBuy, int &cntSell) {

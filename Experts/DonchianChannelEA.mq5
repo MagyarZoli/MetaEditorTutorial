@@ -29,41 +29,10 @@ datetime openTimeBuy = 0;
 datetime openTimeSell = 0;
 
 int OnInit() {
-  if (inpMagincNumber <= 0) {
-    Alert("Magicnumber <= 0");
+  if (!CheckInputs()) {
     return INIT_PARAMETERS_INCORRECT;
   }
-  if (inpLotSize <= 0 || inpLotSize > 10) {
-    Alert("Lot size <= 0 or > 10");
-    return INIT_PARAMETERS_INCORRECT;
-  }
-  if (inpSl < 0) {
-    Alert("Stop loss < 0");
-    return INIT_PARAMETERS_INCORRECT;
-  }
-  if (inpTp < 0) {
-    Alert("Take profit < 0");
-    return INIT_PARAMETERS_INCORRECT;
-  }
-  if (inpTp == 0 && !inpCloseSignal) {
-    Alert("No stop loss and no close signal");
-    return INIT_PARAMETERS_INCORRECT;
-  }
-  if (inpSizeFilter < 0) {
-    Alert("Size filter < 0");
-    return INIT_PARAMETERS_INCORRECT;
-  }
-  if (inpPeriod <= 1) {
-    Alert("Donchian channel period <= 1");
-    return INIT_PARAMETERS_INCORRECT;
-  }
-  if (inpOffset < 0 || inpOffset >= 50) {
-    Alert("Donchian channel offset < 0 or >= 50");
-    return INIT_PARAMETERS_INCORRECT;
-  }
-  
   trade.SetExpertMagicNumber(inpMagincNumber);
-  
   handle = iCustom(
     _Symbol, PERIOD_CURRENT, INDICATOR_NAME,
     inpPeriod, inpOffset, inpColor
@@ -72,14 +41,11 @@ int OnInit() {
     Alert("Failed to create indicator handle");
     return INIT_FAILED;
   }
-  
   ArraySetAsSeries(bufferUpper, true);
   ArraySetAsSeries(bufferLower, true);
-  
   ChartIndicatorDelete(NULL, 0, "Donhian(" + IntegerToString(inpPeriod) + ")");
   ChartIndicatorAdd(NULL, 0, handle);
-  
-  return(INIT_SUCCEEDED);
+  return INIT_SUCCEEDED;
 }
 
 void OnDeinit(const int reason) {
@@ -107,11 +73,6 @@ void OnTick() {
     Print("Faild to get indicator values");
     return;
   }
-  
-  Comment(
-    "bufferUpper[0]: ", bufferUpper[0],
-    "\nbufferLower[0] ", bufferLower[0]
-  );
   
   int cntBuy, cntSell;
   if (!CountOpenPositions(cntBuy, cntSell)) {
@@ -194,6 +155,43 @@ void OnTick() {
       currentTick.bid, sl, tp, "Donchian channel EA"
     );
   }
+}
+
+bool CheckInputs() {
+  bool correct = true;
+  if (inpMagincNumber <= 0) {
+    Alert("Magicnumber <= 0");
+    correct = false;
+  }
+  if (inpLotSize <= 0 || inpLotSize > 10) {
+    Alert("Lot size <= 0 or > 10");
+    correct = false;
+  }
+  if (inpSl < 0) {
+    Alert("Stop loss < 0");
+    correct = false;
+  }
+  if (inpTp < 0) {
+    Alert("Take profit < 0");
+    correct = false;
+  }
+  if (inpTp == 0 && !inpCloseSignal) {
+    Alert("No stop loss and no close signal");
+    correct = false;
+  }
+  if (inpSizeFilter < 0) {
+    Alert("Size filter < 0");
+    correct = false;
+  }
+  if (inpPeriod <= 1) {
+    Alert("Donchian channel period <= 1");
+    correct = false;
+  }
+  if (inpOffset < 0 || inpOffset >= 50) {
+    Alert("Donchian channel offset < 0 or >= 50");
+    correct = false;
+  }
+  return correct;
 }
 
 bool IsNewBar() {
