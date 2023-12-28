@@ -2,11 +2,12 @@
 
 static input long inpMagincNumber = 54321; // magic number
 static input double inpLotSize = 1; // lot size
-input int inpRSIPeriod = 14; // rsi period
-input int inpRSILevel = 70; // rsi level (upper)
-input int inpSl = 0; // stop loss in points (0 = off)
-input int inpTp = 0; // take profit in points (0 = off)
-input bool inpCloseSignal = true; // close trades by opposite signal
+static input int inpRSIPeriod = 14; // rsi period
+static input int inpRSILevel = 70; // rsi level (upper)
+static input int inpSl = 0; // stop loss in points (0 = off)
+static input int inpTp = 0; // take profit in points (0 = off)
+static input bool inpCloseSignal = true; // close trades by opposite signal
+static input int inpMaxConsecutive = 3; // maximum number of consecutive
 
 int handle;
 double buffer[];
@@ -36,16 +37,9 @@ void OnDeinit(const int reason) {
 }
 
 void OnTick() {
-  if (!SymbolInfoTick(_Symbol, currentTick)) {
-    Print("Failed to get current tick");
+  if (!CheckTick()) {
     return;
   }
-  int values = CopyBuffer(handle, 0, 0, 2, buffer);
-  if (values != 2) {
-    Print("Faild to get indicator values");
-    return;
-  }
-  
   int cntBuy, cntSell;
   if (!CountOpenPositions(cntBuy, cntSell)) {
     Print("Failed to count open positions");
@@ -53,8 +47,9 @@ void OnTick() {
   }
   
   if (
-    cntBuy == 0 &&
-    buffer[1] >= (100 - inpRSILevel) && buffer[0] < (100 - inpRSILevel) &&
+    cntBuy < inpMaxConsecutive &&
+    buffer[1] >= (100 - inpRSILevel) &&
+    buffer[0] < (100 - inpRSILevel) &&
     openTimeBuy != iTime(_Symbol, PERIOD_CURRENT, 0)
   ) {
     openTimeBuy = iTime(_Symbol, PERIOD_CURRENT, 0);
@@ -81,8 +76,9 @@ void OnTick() {
   }
   
   if (
-    cntSell == 0 &&
-    buffer[1] <= inpRSILevel && buffer[0] > inpRSILevel &&
+    cntSell < inpMaxConsecutive &&
+    buffer[1] <= inpRSILevel && 
+    buffer[0] > inpRSILevel &&
     openTimeSell != iTime(_Symbol, PERIOD_CURRENT, 0)
   ) {
     openTimeSell = iTime(_Symbol, PERIOD_CURRENT, 0);
@@ -109,10 +105,23 @@ void OnTick() {
   }
 }
 
+bool CheckTick() {
+  if (!SymbolInfoTick(_Symbol, currentTick)) {
+    Print("Failed to get current tick");
+    return false;
+  }
+  int values = CopyBuffer(handle, 0, 0, 2, buffer);
+  if (values != 2) {
+    Print("Faild to get indicator values");
+    return false;
+  }
+  return true;
+}
+
 bool CheckInputs() {
   bool correct = true;
   if (inpMagincNumber <= 0) {
-    Alert("Magicnumber <= 0");
+    Alert("MagicNumber <= 0");
     correct = false;
   }
   if (inpLotSize <= 0 || inpLotSize > 10) {
