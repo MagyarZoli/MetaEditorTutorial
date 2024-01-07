@@ -14,6 +14,75 @@ input int inpShift = 1; //Shift value for RSI.
 input group "==== MA ====";
 input int inpPeriodMA = 3; //Period for the Moving Average.     
 
+class Simulate {
+private:
+  double ctotalProfit;
+  int cmax;
+  int cmin;
+  int cperiod;
+
+public:
+  double cbuffer[];
+  double cbufferMA[];
+  
+  Simulate() {
+    ctotalProfit = 0.0;
+    cmax = 90;
+    cmin = 10;
+    cperiod = 5;
+  }
+  
+  Simulate(double totalProfit, double &buffer[], double &bufferMA[], int max, int min, int period) {
+    ctotalProfit = totalProfit;
+    cmax = max;
+    cmin = min;
+    cperiod = period;
+    CopyArray(buffer, cbuffer);
+    CopyArray(bufferMA, cbufferMA);
+  }
+  
+  Simulate(const Simulate &other) {
+    ctotalProfit = other.GetTotalProfit();
+    cmax = other.GetMax();
+    cmin = other.GetMin();
+    cperiod = other.GetPeriod();
+    CopyArray(other.cbuffer, cbuffer);
+    CopyArray(other.cbufferMA, cbufferMA);
+  }
+  
+  double GetTotalProfit() const{
+    return ctotalProfit;
+  }
+  
+  void GetBuffer(double &buffer[]) {
+    CopyArray(cbuffer, buffer);
+  }
+  
+  void GetBufferMA(double &bufferMA[]) {
+    CopyArray(cbufferMA, bufferMA);
+  }
+  
+  int GetMax() const {
+    return cmax;
+  }
+  
+  int GetMin() const {
+    return cmin;
+  }
+  
+  int GetPeriod() const {
+    return cperiod;
+  }
+
+private:
+  void CopyArray(const double &sourceArray[], double &destinationArray[]) {
+    ArrayResize(destinationArray, ArraySize(sourceArray));
+    for (int i = 0; i < ArraySize(sourceArray); i++) {
+        destinationArray[i] = sourceArray[i];
+    }
+  }
+};
+
 CTrade trade;
 MqlTick currentTick; 
 int start = 5;
@@ -36,67 +105,8 @@ int simulateBuyCount[25];
 ulong simulateTicketSell[25];
 ulong simulateTicketBuy[25];
 bool half = false; 
-
-class Simulate {
-private:
-  double ctotalProfit;
-  double cbuffer[];
-  double cbufferMA[];
-  int cmax;
-  int cmin;
-  int cperiod;
-  
-public:
-  Simulate(double totalProfit, double &buffer[], double &bufferMA[], int max, int min, int period) {
-    ctotalProfit = totalProfit;
-    CopyArray(buffer, cbuffer);
-    CopyArray(bufferMA, cbufferMA);
-    cmax = max;
-    cmin = min;
-    cperiod = period;
-  }
-  
-  Simulate(const Simulate &other) {
-    ctotalProfit = other.ctotalProfit;
-    CopyArray(other.cbuffer, cbuffer);
-    CopyArray(other.cbufferMA, cbufferMA);
-    cmax = other.cmax;
-    cmin = other.cmin;
-    cperiod = other.cperiod;
-  }
-  
-  double GetTotalProfit() {
-    return ctotalProfit;
-  }
-  
-  void GetBuffer(double &buffer[]) {
-    CopyArray(cbuffer, buffer);
-  }
-  
-  void GetBufferMA(double &bufferMA[]) {
-    CopyArray(cbufferMA, bufferMA);
-  }
-  
-  int GetMax() {
-    return cmax;
-  }
-  
-  int GetMin() {
-    return cmin;
-  }
-  
-  int GetPeriod() {
-    return cperiod;
-  }
-
-private:
-  void CopyArray(const double &sourceArray[], double &destinationArray[]) {
-    ArrayResize(destinationArray, ArraySize(sourceArray));
-    for (int i = 0; i < ArraySize(sourceArray); i++) {
-        destinationArray[i] = sourceArray[i];
-    }
-  }
-};
+Simulate bestSell;
+Simulate bestBuy;
 
 int OnInit() {
   if (!CheckInputs()) {
@@ -107,6 +117,8 @@ int OnInit() {
   sellStrategy[1] = true;
   buyStrategy[0] = true;
   buyStrategy[1] = true;
+  bestSell = Simulate();
+  bestBuy = Simulate();
   for (int i = 0; i < ArraySize(handle); i++) {
     handle[i] = iRSI(_Symbol, PERIOD_CURRENT, i + start, PRICE_CLOSE); 
     if (handle[i] == INVALID_HANDLE) {
@@ -127,8 +139,9 @@ void OnDeinit(const int reason) {
 
 void OnTick() {
   closePrice = iClose(_Symbol, PERIOD_CURRENT, 0);
-  Simulate simulateSellProfit[];
-  Simulate simulateBuyProfit[];
+  Simulate simulateSellProfit[25 * 4];
+  Simulate simulateBuyProfit[25 * 4];
+  int index = 0;
   if (TimeCurrent() > lastOrderTime + timeInterval) {
     for (int i = 0; i < ArraySize(handle); i++) {
       double buffer[];
@@ -142,27 +155,13 @@ void OnTick() {
       for (int j = 10; j <= 40; j += 10) {
         lastOrderTime = TimeCurrent();
         Level(buffer, 100 - j, j);
-        int indexSell = (j / 10) - 1;
-        int indexBuy = (j / 10) - 1;
-        //Print("Iteration: " + (string)j + " IndexSell: " + (string)indexSell + " IndexBuy: " + (string)indexBuy);
-        Print("Array Sizes - Sell: " + (string)ArraySize(simulateSellProfit) + " Buy: " + (string)ArraySize(simulateBuyProfit));
-        //if (indexSell >= 0 && indexSell < ArraySize(simulateSellProfit)) {
-          //simulateSellProfit[indexSell] = SimulateSellStrategy(simulateSellCount[i], i, buffer, bufferMA, 100 - j, j, i + start);
-          simulateSellCount[i]++;
-        //} else {
-        //  Print("--------------Invalid index for simulateSellProfit: " + (string)indexSell);
-        //}
-        //if (indexBuy >= 0 && indexBuy < ArraySize(simulateBuyProfit)) {
-          //simulateBuyProfit[indexBuy] = SimulateBuyStrategy(simulateBuyCount[i], i, buffer, bufferMA, 100 - j, j, i + start);
-          simulateBuyCount[i]++;
-        //} else {
-        //  Print("--------------Invalid index for simulateBuyProfit: " + (string)indexBuy);
-        //}
+        simulateSellProfit[index] = SimulateSellStrategy(simulateSellCount[i]++, i, buffer, bufferMA, 100 - j, j, i + start);
+        simulateBuyProfit[index] = SimulateBuyStrategy(simulateBuyCount[i]++, i, buffer, bufferMA, 100 - j, j, i + start);
+        index++;
       }
     }
-    Print("Sell Profits: " + (string) ArraySize(simulateSellProfit)); //Sel Profits: 0
-    Print("Buy Profits: " + (string) ArraySize(simulateBuyProfit)); //Buy Profits: 0
-    //BestSimulate(simulateSellProfit, simulateBuyProfit);
+    BestSellSimulate(simulateSellProfit);
+    BestBuySimulate(simulateBuyProfit);
   }
 }
 
@@ -174,7 +173,7 @@ Simulate SimulateSellStrategy(int i, int index, double &buffer[], double &buffer
     if (sellStrategy[0] && buffer[1] >= (max - period) && buffer[1] < max) {
       sellStrategy[0] = false;  
       totalProfit += iClose(_Symbol, PERIOD_CURRENT, i) - iOpen(_Symbol, PERIOD_CURRENT, i);
-      simulateBuyCount[index] = 0;
+      simulateBuyCount[index] = 0; 
     } else if (sellStrategy[1] && buffer[1] >= max && buffer[1] < (max + period)) {
       sellStrategy[1] = false;
       totalProfit += iClose(_Symbol, PERIOD_CURRENT, i) - iOpen(_Symbol, PERIOD_CURRENT, i);
@@ -234,56 +233,90 @@ Simulate SimulateBuyStrategy(int i, int index, double &buffer[], double &bufferM
   return Simulate(totalProfit, buffer, bufferMA, max, min, period);
 }
 
-void BestSimulate(Simulate &simulateSellProfit[], Simulate &simulateBuyProfit[]) {
-  if (ArraySize(simulateSellProfit) != ArraySize(simulateBuyProfit)) {
-    Print("Error: Sell and Buy arrays must have the same size.");
-    return;
-  }
-  Print((string) ArraySize(simulateSellProfit) + " " + (string) ArraySize(simulateBuyProfit)); 
+void BestSellSimulate(Simulate &simulateSellProfit[]) {
   double bestSellTotalProfit = 0.0;
-  double bestBuyTotalProfit = 0.0;
-  int bestSellIndex = 0;
-  int bestBuyIndex = 0;
+  int bestSellIndex = -1;
   for (int i = 0; i < ArraySize(simulateSellProfit); i++) {
     if (simulateSellProfit[i].GetTotalProfit() > bestSellTotalProfit) {
       bestSellTotalProfit = simulateSellProfit[i].GetTotalProfit();
       bestSellIndex = i;
+      bestSell = Simulate(simulateSellProfit[bestSellIndex]);
     }
-    if (simulateBuyProfit[i].GetTotalProfit() > bestBuyTotalProfit) {
-      bestBuyTotalProfit = simulateBuyProfit[i].GetTotalProfit();
-      bestBuyIndex = i;
+  }
+  if (bestSellIndex == -1) {
+    for (int i = 0; i < ArraySize(simulateSellProfit); i++) {
+      if (bestSell.GetPeriod() == simulateSellProfit[i].GetPeriod() && bestSell.GetMax() == simulateSellProfit[i].GetMax() && bestSell.GetMin() == simulateSellProfit[i].GetMin()) {
+        bestSellIndex = i;
+      }
     }
   }
   double sellBuffer[];
   double sellBufferMA[];
-  double buyBuffer[];
-  double buyBufferMA[];
   simulateSellProfit[bestSellIndex].GetBuffer(sellBuffer);
   simulateSellProfit[bestSellIndex].GetBufferMA(sellBufferMA);
+  TradeSellStrategy(sellCount, sellBuffer, sellBufferMA, simulateSellProfit[bestSellIndex].GetMax(), simulateSellProfit[bestSellIndex].GetMin(), simulateSellProfit[bestSellIndex].GetPeriod());
+  /*
+  Print(
+    "bestSell: " + 
+    (string)simulateSellProfit[bestSellIndex].GetPeriod() + ", " +
+    (string)simulateSellProfit[bestSellIndex].GetMax() + ", " +
+    (string)simulateSellProfit[bestSellIndex].GetMin() + ", " +
+    (string)simulateSellProfit[bestSellIndex].GetTotalProfit()
+  );
+  */
+}
+
+void BestBuySimulate(Simulate &simulateBuyProfit[]) {
+  double bestBuyTotalProfit = 0.0;
+  int bestBuyIndex = -1;
+  for (int i = 0; i < ArraySize(simulateBuyProfit); i++) {
+    if (simulateBuyProfit[i].GetTotalProfit() > bestBuyTotalProfit) {
+      bestBuyTotalProfit = simulateBuyProfit[i].GetTotalProfit();
+      bestBuyIndex = i;
+      bestBuy = Simulate(simulateBuyProfit[bestBuyIndex]);
+    }
+  }
+  if (bestBuyIndex == -1) {
+    for (int i = 0; i < ArraySize(simulateBuyProfit); i++) {
+      if (bestBuy.GetPeriod() == simulateBuyProfit[i].GetPeriod() && bestBuy.GetMax() == simulateBuyProfit[i].GetMax() && bestBuy.GetMin() == simulateBuyProfit[i].GetMin()) {
+        bestBuyIndex = i;
+      }
+    }
+  }
+  double buyBuffer[];
+  double buyBufferMA[];
   simulateBuyProfit[bestBuyIndex].GetBuffer(buyBuffer);
   simulateBuyProfit[bestBuyIndex].GetBufferMA(buyBufferMA);
-  TradeSellStrategy(sellCount, sellBuffer, sellBufferMA, simulateSellProfit[bestSellIndex].GetMax(), simulateSellProfit[bestSellIndex].GetMin(), simulateSellProfit[bestSellIndex].GetPeriod());
   TradeBuyStrategy(buyCount, buyBuffer, buyBufferMA, simulateBuyProfit[bestBuyIndex].GetMax(), simulateBuyProfit[bestBuyIndex].GetMin(), simulateBuyProfit[bestBuyIndex].GetPeriod());
+  /*
+  Print(
+    "bestBuy: " + 
+    (string)simulateBuyProfit[bestBuyIndex].GetPeriod() + ", " +
+    (string)simulateBuyProfit[bestBuyIndex].GetMax() + ", " +
+    (string)simulateBuyProfit[bestBuyIndex].GetMin() + ", " +
+    (string)simulateBuyProfit[bestBuyIndex].GetTotalProfit()
+  );
+  */
 }
 
 void TradeSellStrategy(int i, double &buffer[], double &bufferMA[], int max, int min, int period) {
   ArrayResize(ticketSell, (i + 1));
   ticketSell[i] = 0;
   double rsima = RSIMovingAverage(bufferMA);
-  if (buffer[0] < buffer[1] && ticketSell[i] <= 0) {
-    if (sellStrategy[0] && buffer[1] >= (max - period) && buffer[1] < max) {
+  if (buffer[1] < buffer[2] && ticketSell[i] <= 0) {
+    if (sellStrategy[0] && buffer[2] >= (max - period) && buffer[2] < max) {
       sellStrategy[0] = false;
       TradeSell(i);
       CloseAllBuy();
-    } else if (sellStrategy[1] && buffer[1] >= max && buffer[1] < (max + period)) {
+    } else if (sellStrategy[1] && buffer[2] >= max && buffer[2] < (max + period)) {
       sellStrategy[1] = false;
       TradeSell(i);
       CloseAllBuy();
-    } else if (!strategy[0] && buffer[1] >= (max + period)) {
+    } else if (!strategy[0] && buffer[2] >= (max + period)) {
       strategy[0] = true;
       TradeSell(i);
       CloseAllBuy();
-    } else if (!strategy[1] && (buffer[0] > max || buffer[1] > max) && buffer[0] < buffer[1]) {
+    } else if (!strategy[1] && (buffer[1] > max || buffer[2] > max) && buffer[1] < buffer[2]) {
       strategy[1] = true;
       TradeSell(i);
       CloseAllBuy();
@@ -303,20 +336,20 @@ void TradeBuyStrategy(int i, double &buffer[],  double &bufferMA[], int max, int
   ArrayResize(ticketBuy, (i + 1));
   ticketBuy[i] = 0;
   double rsima = RSIMovingAverage(bufferMA);
-  if (buffer[0] > buffer[1] && ticketBuy[i] <= 0) {
-    if (buyStrategy[0] && buffer[1] <= (min + period) && buffer[1] > min) {
+  if (buffer[1] > buffer[2] && ticketBuy[i] <= 0) {
+    if (buyStrategy[0] && buffer[2] <= (min + period) && buffer[2] > min) {
       buyStrategy[0] = false;
       TradeBuy(i);
       CloseAllSell();
-    } else if (buyStrategy[1] && buffer[1] <= min && buffer[1] > (min - period)) {
+    } else if (buyStrategy[1] && buffer[2] <= min && buffer[2] > (min - period)) {
       buyStrategy[1] = false;
       TradeBuy(i);
       CloseAllSell();
-    } else if (strategy[0] && buffer[1] <= (min - period)) {
+    } else if (strategy[0] && buffer[2] <= (min - period)) {
       strategy[0] = false;
       TradeBuy(i);
       CloseAllSell();
-    } else if (strategy[1] && (buffer[0] < min || buffer[1] < min) && buffer[0] > buffer[1]) {
+    } else if (strategy[1] && (buffer[1] < min || buffer[2] < min) && buffer[1] > buffer[2]) {
       strategy[1] = false;
       TradeBuy(i);
       CloseAllSell();
