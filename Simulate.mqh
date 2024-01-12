@@ -1,61 +1,85 @@
 class Simulate {
 private:
-  double ctotalProfit;
-  int cmax;
-  int cmin;
-  int cperiod;
+  double cTotalProfit;
+  int cMax;
+  int cMin;
+  int cPeriod;
 
 public:
-  double cbuffer[];
-  double cbufferMA[];
+  double gBuffer[];
+  double gBufferMA[];
   
   Simulate() {
-    ctotalProfit = 0.0;
-    cmax = 90;
-    cmin = 10;
-    cperiod = 5;
+    cTotalProfit = 0.0;
+    cMax = 90;
+    cMin = 10;
+    cPeriod = 5;
   }
   
   Simulate(double totalProfit, double &buffer[], double &bufferMA[], int max, int min, int period) {
-    ctotalProfit = totalProfit;
-    cmax = max;
-    cmin = min;
-    cperiod = period;
-    CopyArray(buffer, cbuffer);
-    CopyArray(bufferMA, cbufferMA);
+    cTotalProfit = totalProfit;
+    cMax = max;
+    cMin = min;
+    cPeriod = period;
+    CopyArray(buffer, gBuffer);
+    CopyArray(bufferMA, gBufferMA);
   }
   
   Simulate(const Simulate &other) {
-    ctotalProfit = other.GetTotalProfit();
-    cmax = other.GetMax();
-    cmin = other.GetMin();
-    cperiod = other.GetPeriod();
-    CopyArray(other.cbuffer, cbuffer);
-    CopyArray(other.cbufferMA, cbufferMA);
+    cTotalProfit = other.GetTotalProfit();
+    cMax = other.GetMax();
+    cMin = other.GetMin();
+    cPeriod = other.GetPeriod();
+    CopyArray(other.gBuffer, gBuffer);
+    CopyArray(other.gBufferMA, gBufferMA);
   }
   
   double GetTotalProfit() const{
-    return ctotalProfit;
+    return cTotalProfit;
   }
   
   void GetBuffer(double &buffer[]) {
-    CopyArray(cbuffer, buffer);
+    CopyArray(gBuffer, buffer);
   }
   
   void GetBufferMA(double &bufferMA[]) {
-    CopyArray(cbufferMA, bufferMA);
+    CopyArray(gBufferMA, bufferMA);
   }
   
   int GetMax() const {
-    return cmax;
+    return cMax;
   }
   
   int GetMin() const {
-    return cmin;
+    return cMin;
   }
   
   int GetPeriod() const {
-    return cperiod;
+    return cPeriod;
+  }
+
+  int Comparable(const Simulate &other) {
+    if (cTotalProfit > other.GetTotalProfit()) {
+      return 1;
+    } else if (cTotalProfit < other.GetTotalProfit()) {
+      return -1;
+    } 
+    if (cPeriod > other.GetPeriod()) {
+      return 1;
+    } else if (cPeriod < other.GetPeriod()) {
+      return -1;
+    }
+    if (cMax > other.GetMax()) {
+      return 1;
+    } else if (cMax < other.GetMax()) {
+      return -1;
+    }
+    if (cMin > other.GetMin()) {
+      return 1;
+    } else if (cMin < other.GetMin()) {
+      return 1;
+    } 
+    return 0;
   }
 
 private:

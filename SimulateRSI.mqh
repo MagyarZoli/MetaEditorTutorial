@@ -11,7 +11,6 @@ private:
   int cMin;
   int cShift;
   int cTimeInterval;
-  
   int gHandle;
   int gSellCount;
   int gBuyCount;
@@ -22,15 +21,15 @@ private:
   datetime gLastOrderTime;
   bool gHighLevel[2];
   bool gLowLevel[2];
-  
   bool gStrategy[4];
   bool gSellStrategy[2];
   bool gBuyStrategy[2];
-  
   double gSellApplied[];
   double gBuyApplied[];
   double gSellProfit;
   double gBuyProfit;
+  Simulate gSell;
+  Simulate gBuy;
   
 public:
   SimulateRSI() {
@@ -118,6 +117,87 @@ public:
     return cTimeInterval;
   }
   
+  Simulate GetSellSimulate() const {
+    return gSell;
+  }
+  
+  Simulate GetBuySimulate() const {
+    return gBuy;
+  }
+  
+  double GetSellTotalProfit() const {
+    return gSell.GetTotalProfit();
+  }
+  
+  double GetBuyTotalProfit() const {
+    return gBuy.GetTotalProfit();
+  }
+  
+  void Tick() {
+    CopyBuffer(gHandle, 0, cShift, 3, gBufferRSI);
+    CopyBuffer(gHandle, 0, cShift, cPeriodMA, gBufferMA);
+    if (TimeCurrent() > gLastOrderTime + cTimeInterval) {
+      Level(10);
+      gSell = SimulateSellStrategy();
+      gBuy = SimulateBuyStrategy();
+      gLastOrderTime = TimeCurrent();
+    }
+  }
+  
+  int Comparable(const SimulateRSI &other) {
+    if (gBuy.Comparable(other.GetBuySimulate()) >= 1) {
+      return 1;
+    } else if (gBuy.Comparable(other.GetBuySimulate()) <= -1) {
+      return -1;
+    }
+    if (cPeriod > other.GetPeriod()) {
+      return 1;
+    } else if (cPeriod < other.GetPeriod()) {
+      return -1;
+    }
+    if (cPeriodRSI > other.GetPeriodRSI()) {
+      return 1;
+    } else if (cPeriodRSI < other.GetPeriodRSI()) {
+      return -1;
+    }
+    if (cPeriodMA > other.GetPeriodMA()) {
+      return 1;
+    } else if (cPeriodMA < other.GetPeriodMA()) {
+      return -1;
+    }
+    if (cAppliedPrice > other.GetAppliedPrice()) {
+      return 1;
+    } else if (cAppliedPrice < other.GetAppliedPrice()) {
+      return -1;
+    }
+    if (cMax > other.GetMax()) {
+      return 1;
+    } else if (cMax < other.GetMax()) {
+      return -1;
+    }
+    if (cMin > other.GetMin()) {
+      return 1;
+    } else if (cMin < other.GetMin()) {
+      return -1;
+    }
+    if (cShift > other.GetShift()) {
+      return 1;
+    } else if (cShift < other.GetShift()) {
+      return -1;
+    }
+    if (cTimeInterval > other.GetTimeInterval()) {
+      return 1;
+    } else if (cTimeInterval < other.GetTimeInterval()) {
+      return -1;
+    }
+    if (cSymbol.Compare(other.GetSymbol(), true) >= 1) {
+      return 1;
+    } else if (cSymbol.Compare(other.GetSymbol(), true) <= -1) {
+      return -1;
+    }
+    return 0;
+  }
+  
 private:
   void HandleInit() {
     gHandle = iRSI(cSymbol, cPeriod, cPeriodRSI, cAppliedPrice);
@@ -129,40 +209,6 @@ private:
     gBuyCount = 0;
     ArraySetAsSeries(gBufferRSI, true);
     ArraySetAsSeries(gBufferMA, true);
-  }
-
-  void Tick() {
-    CopyBuffer(gHandle, 0, cShift, 3, gBufferRSI);
-    CopyBuffer(gHandle, 0, cShift, cPeriodMA, gBufferMA);
-    if (TimeCurrent() > gLastOrderTime + cTimeInterval) {
-      Level(10);
-      //
-      //
-      gLastOrderTime = TimeCurrent();
-    }
-  }
-  
-  void Level(int border) {
-    for (int i = 0; i <= 1; i++) {
-      if (gBufferRSI[i] > cMax) {
-        gHighLevel[i] = true;
-      } else if (gBufferRSI[i] < (cMax - border)) {
-        gHighLevel[i] = false;
-      }
-      if (gBufferRSI[i] < cMin) {
-        gLowLevel[i] = true;
-      } else if (gBufferRSI[i] > (cMin + border)) {
-        gLowLevel[i] = false;
-      }
-    }
-  }
-  
-  double RSIMovingAverage() {
-    double rsima = 0;
-    for (int i = 0; i < ArraySize(gBufferMA); i++) {
-      rsima += gBufferMA[i];
-    }
-    return rsima / cPeriodMA;
   }
   
   Simulate SimulateSellStrategy() {
@@ -277,5 +323,28 @@ private:
       gBuyApplied[i] = 0;
     }
     return result;
+  }
+  
+  void Level(int border) {
+    for (int i = 0; i <= 1; i++) {
+      if (gBufferRSI[i] > cMax) {
+        gHighLevel[i] = true;
+      } else if (gBufferRSI[i] < (cMax - border)) {
+        gHighLevel[i] = false;
+      }
+      if (gBufferRSI[i] < cMin) {
+        gLowLevel[i] = true;
+      } else if (gBufferRSI[i] > (cMin + border)) {
+        gLowLevel[i] = false;
+      }
+    }
+  }
+  
+  double RSIMovingAverage() {
+    double rsima = 0;
+    for (int i = 0; i < ArraySize(gBufferMA); i++) {
+      rsima += gBufferMA[i];
+    }
+    return rsima / cPeriodMA;
   }
 };
