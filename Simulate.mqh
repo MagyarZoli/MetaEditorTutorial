@@ -34,16 +34,8 @@ public:
     CopyArray(other.gBufferMA, gBufferMA);
   }
   
-  double GetTotalProfit() const{
+  double GetTotalProfit() const {
     return cTotalProfit;
-  }
-  
-  void GetBuffer(double &buffer[]) {
-    CopyArray(gBuffer, buffer);
-  }
-  
-  void GetBufferMA(double &bufferMA[]) {
-    CopyArray(gBufferMA, bufferMA);
   }
   
   int GetMax() const {
@@ -56,6 +48,14 @@ public:
   
   int GetPeriod() const {
     return cPeriod;
+  }
+  
+  void GetBuffer(double &buffer[]) {
+    CopyArray(gBuffer, buffer);
+  }
+  
+  void GetBufferMA(double &bufferMA[]) {
+    CopyArray(gBufferMA, bufferMA);
   }
 
   int Comparable(const Simulate &other) {

@@ -116,7 +116,8 @@ public:
   int GetTimeInterval() const {
     return cTimeInterval;
   }
-  
+
+public:  
   Simulate GetSellSimulate() const {
     return gSell;
   }
@@ -209,6 +210,10 @@ private:
     gBuyCount = 0;
     ArraySetAsSeries(gBufferRSI, true);
     ArraySetAsSeries(gBufferMA, true);
+    ArrayResize(gSellApplied, 30);
+    ArrayResize(gBuyApplied, 30);
+    gLastOrderTime = TimeCurrent() - cTimeInterval;
+    Tick();
   }
   
   Simulate SimulateSellStrategy() {
