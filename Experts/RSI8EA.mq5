@@ -120,8 +120,9 @@ void TradeSellStrategy(SimulateRSI &sellSimulateRSI) {
   gTicketSell[gSellCount] = 0;
   double buffer[];
   double bufferMA[];
-  Simulate simulate = Simulate(sellSimulateRSI.GetSellSimulate());
+  Simulate simulate = sellSimulateRSI.GetSellSimulate();
   simulate.GetBuffer(buffer);
+  simulate.GetBufferMA(bufferMA);
   int max = simulate.GetMax();
   int min = simulate.GetMin();
   double rsima = RSIMovingAverage(bufferMA);

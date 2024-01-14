@@ -14,6 +14,8 @@ public:
     cMax = 90;
     cMin = 10;
     cPeriod = 5;
+    ArrayResize(gBuffer, 3);
+    ArrayResize(gBufferMA, 3);
   }
   
   Simulate(double totalProfit, double &buffer[], double &bufferMA[], int max, int min, int period) {
