@@ -1,10 +1,14 @@
 #include "../Simulate.mqh"
 #include "../SimulateRSI.mqh"
+#include "../WriteTradeHistory.mqh"
+#include "../WriteJSON.mqh"
+#include "../TradeLog.mqh"
 
 #include <Trade/Trade.mqh>
 
 input group "==== Magic Number ====";
 input int inpMagicNumber = 99915; //Magic number for the EA's trades.
+input string inpFileName = "History.json";
 input group "==== General =====";
 input double inpLotSize = 1.0; //Lot size for trading.
 input int inpStopLoss = 0; //Stop loss value.
@@ -20,7 +24,7 @@ input int inpPeriodMA = 3; //Period for the Moving Average.
 
 CTrade gTrade;
 MqlTick gCurrentTick;
-SimulateRSI gHandle[]; 
+SimulateRSI gHandle[];
 int gStart = 5;
 int gEnd = 30;
 int gBreakOut = 10;
@@ -37,6 +41,11 @@ bool gSellStrategy[2];
 bool gBuyStrategy[2]; 
 bool gHighLevel[2]; 
 bool gLowLevel[2]; 
+TradeLog gTradeLogs[];
+WriteTradeHistory *gWriteJSON = new WriteJSON();
+
+double gtotalProfit = 0.0;
+double gtotalLoss = 0.0;
 
 int OnInit() {
   if (!CheckInputs()) {
@@ -65,6 +74,10 @@ void OnTick() {
     gBestSell = BestSellSimulate();
     gBestBuy = BestBuySimulate();
   }
+  
+  /////////////////////////////////////////////////////////////////////////////////////////////////
+  double profitLoss = AccountInfoDouble(ACCOUNT_BALANCE) - AccountInfoDouble(ACCOUNT_EQUITY); 
+  WriteTradeInfo(profitLoss);
 }
 
 SimulateRSI BestSellSimulate() {
@@ -208,6 +221,7 @@ void TradeSell() {
   }
   gTrade.Sell(inpLotSize, _Symbol, gCurrentTick.bid, sl, tp, "TradeSell()");
   gTicketSell[gSellCount++] = gTrade.ResultOrder();
+  LogTrade(0, OrderGetDouble(ORDER_PRICE_OPEN), 0.0, 0.0);
 }
 
 void TradeBuy() {
@@ -223,6 +237,7 @@ void TradeBuy() {
   }
   gTrade.Buy(inpLotSize, _Symbol, gCurrentTick.ask, sl, tp, "TradeBuy()");
   gTicketBuy[gBuyCount++] = gTrade.ResultOrder();
+  LogTrade(0, OrderGetDouble(ORDER_PRICE_OPEN), 0.0, 0.0);
 }
 
 void CloseAllSell() {
@@ -235,6 +250,8 @@ void CloseAllSell() {
     for (int k = 0; k < ArraySize(gSellStrategy); k++) {
       gSellStrategy[k] = true;
     }
+    LogTrade(0, 0.0, OrderGetDouble(ORDER_PRICE_CURRENT), 0.0);
+    gWriteJSON.WriteToFile(inpFileName, gTradeLogs);
   }
 }
 
@@ -248,6 +265,8 @@ void CloseAllBuy() {
     for (int k = 0; k < ArraySize(gBuyStrategy); k++) {
       gBuyStrategy[k] = true;
     }
+    LogTrade(0, 0.0, OrderGetDouble(ORDER_PRICE_CURRENT), 0.0);
+    gWriteJSON.WriteToFile(inpFileName, gTradeLogs);
   }
 }
 
@@ -304,4 +323,29 @@ double RSIMovingAverage(double &bufferMA[]) {
     rsima += bufferMA[i];
   }
   return rsima / inpPeriodMA;
+}
+
+void LogTrade(ulong ticket, double entryPrice, double exitPrice, double profit) {
+  TradeLog tradeLog = new TradeLog(ticket, entryPrice, exitPrice, profit);
+  ArrayResize(gTradeLogs, ArraySize(gTradeLogs) + 1);
+  gTradeLogs[ArraySize(gTradeLogs) - 1] = tradeLog;
+}
+
+void WriteTradeInfo(double profitLoss) {
+  string fileName = "TradeInfo.txt";
+  int fileHandle = FileOpen(fileName, FILE_WRITE | FILE_TXT | FILE_CSV);
+  if (fileHandle > 0) {
+    datetime currentTime = TimeCurrent();
+    string tradeDateTime = TimeToString(currentTime);
+    FileWrite(fileHandle, tradeDateTime, ", ", profitLoss);
+    if (profitLoss > 0) {
+      gtotalProfit += profitLoss;
+    } else {
+      gtotalLoss += MathAbs(profitLoss);
+    }
+    FileWrite(fileHandle, ", Total Profit: ", gtotalProfit, ", Total Loss: ", gtotalLoss);
+    FileClose(fileHandle);
+  } else {
+    Print("Error opening file: ", fileName);
+  }
 }
